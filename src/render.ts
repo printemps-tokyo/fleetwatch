@@ -8,6 +8,8 @@ export interface Row {
   reason: string;
   /** Blocked-pane triage bucket (auth / confirm / select / input). */
   category?: string;
+  /** How long the pane has held this state (watch mode only), e.g. "12m". */
+  age?: string;
 }
 
 const COLORS: Record<string, string> = {
@@ -58,11 +60,13 @@ export function renderTable(rows: Row[], color: boolean): string {
   const sorted = sortRows(rows);
   const tw = Math.max(6, ...sorted.map((r) => r.target.length));
   const pw = Math.max(7, ...sorted.map((r) => r.project.length));
+  const aw = Math.max(0, ...sorted.map((r) => (r.age ?? "").length));
   const lines: string[] = [];
   for (const r of sorted) {
     const state = color ? `${STATE_COLOR[r.state]}${pad(r.state.toUpperCase(), 8)}${COLORS.reset}` : pad(r.state.toUpperCase(), 8);
+    const age = aw > 0 ? `  ${pad(r.age ?? "", aw)}` : "";
     const detail = r.category ? `[${r.category}] ${r.reason}` : r.reason;
-    lines.push(`${pad(r.target, tw)}  ${pad(r.project, pw)}  ${state}  ${detail}`);
+    lines.push(`${pad(r.target, tw)}  ${pad(r.project, pw)}  ${state}${age}  ${detail}`);
   }
 
   const c = summarize(sorted);

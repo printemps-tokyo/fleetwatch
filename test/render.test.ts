@@ -28,6 +28,11 @@ describe("renderTable", () => {
   it("handles no panes", () => {
     expect(renderTable([], false)).toContain("no Claude Code panes found");
   });
+
+  it("shows an age column when rows carry one (watch mode)", () => {
+    const withAge: Row[] = [{ target: "7:12.1", project: "rive", state: "blocked", reason: "sign-in prompt", category: "auth", age: "12m" }];
+    expect(renderTable(withAge, false)).toContain("12m");
+  });
 });
 
 describe("renderJson", () => {

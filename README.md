@@ -63,7 +63,9 @@ fleetwatch --json              # machine-readable
 | `--no-color` | Disable ANSI colors |
 
 In one-shot mode the exit code is `1` when any pane is blocked, so it fits in
-scripts and status bars.
+scripts and status bars. In `--watch` mode each row also shows how long the pane
+has held its current state (e.g. `BLOCKED 12m`), so the one stuck longest stands
+out.
 
 ## How panes are detected and classified
 

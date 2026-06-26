@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { classifyPane } from "./classify.js";
 import { parsePaneList, isClaudePane, projectName, DEFAULT_MATCH, LIST_FORMAT } from "./tmux.js";
 import { renderJson, renderTable, summarize, type Row } from "./render.js";
+import { updateTracker, elapsedMs, humanizeDuration, type Tracker } from "./track.js";
 
 const HELP = `fleetwatch - watch your tmux Claude Code panes
 
@@ -135,8 +136,21 @@ async function main(): Promise<number> {
 
   // Watch mode: refresh until interrupted, ringing the bell on newly-blocked panes.
   let prevBlocked = new Set<string>();
+  let tracker: Tracker = new Map();
   for (;;) {
     const rows = build();
+    const now = Date.now();
+    tracker = updateTracker(
+      tracker,
+      rows.map((r) => ({ key: r.target, state: r.state })),
+      now,
+    );
+    for (const r of rows) {
+      const ms = elapsedMs(tracker, r.target, now);
+      if (ms !== undefined) {
+        r.age = humanizeDuration(ms);
+      }
+    }
     const blocked = new Set(rows.filter((r) => r.state === "blocked").map((r) => r.target));
     const isNew = [...blocked].some((t) => !prevBlocked.has(t));
     prevBlocked = blocked;

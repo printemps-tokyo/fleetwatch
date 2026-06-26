@@ -15,3 +15,6 @@ export { parsePaneList, isClaudePane, projectName, DEFAULT_MATCH, LIST_FORMAT } 
 
 export type { Row } from "./render.js";
 export { renderTable, renderJson, sortRows, summarize } from "./render.js";
+
+export type { Sample, Tracker } from "./track.js";
+export { updateTracker, elapsedMs, humanizeDuration } from "./track.js";
