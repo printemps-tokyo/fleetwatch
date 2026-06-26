@@ -153,7 +153,7 @@ async function main(): Promise<number> {
 
   if (!watching) {
     const rows = build();
-    process.stdout.write(values.json ? renderJson(rows) : renderTable(rows, color));
+    process.stdout.write(values.json ? renderJson(rows, new Date().toISOString()) : renderTable(rows, color));
     return summarize(rows).blocked > 0 ? 1 : 0;
   }
 
@@ -194,7 +194,7 @@ async function main(): Promise<number> {
       process.stdout.write("\x1b[2J\x1b[H"); // clear screen
       process.stdout.write(`fleetwatch · ${new Date().toLocaleTimeString()} · every ${intervalMs / 1000}s\n\n`);
     }
-    process.stdout.write(values.json ? renderJson(rows) : renderTable(rows, color));
+    process.stdout.write(values.json ? renderJson(rows, new Date().toISOString()) : renderTable(rows, color));
     if (values.bell && newlyBlocked.length > 0) {
       process.stdout.write("\x07");
     }

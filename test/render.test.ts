@@ -40,5 +40,11 @@ describe("renderJson", () => {
     const parsed = JSON.parse(renderJson(rows));
     expect(parsed.panes[0].state).toBe("blocked");
     expect(parsed.summary.blocked).toBe(1);
+    expect(parsed.generatedAt).toBeUndefined();
+  });
+
+  it("includes a generatedAt timestamp when given", () => {
+    const parsed = JSON.parse(renderJson(rows, "2026-06-27T00:00:00.000Z"));
+    expect(parsed.generatedAt).toBe("2026-06-27T00:00:00.000Z");
   });
 });

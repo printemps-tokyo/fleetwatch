@@ -80,8 +80,9 @@ export function renderTable(rows: Row[], color: boolean): string {
   return lines.join("\n") + "\n";
 }
 
-/** Render the classified panes as JSON. */
-export function renderJson(rows: Row[]): string {
+/** Render the classified panes as JSON. `at` (an ISO time) stamps the snapshot. */
+export function renderJson(rows: Row[], at?: string): string {
   const sorted = sortRows(rows);
-  return JSON.stringify({ panes: sorted, summary: summarize(sorted) }, null, 2) + "\n";
+  const payload = { ...(at ? { generatedAt: at } : {}), panes: sorted, summary: summarize(sorted) };
+  return JSON.stringify(payload, null, 2) + "\n";
 }
