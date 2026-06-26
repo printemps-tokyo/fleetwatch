@@ -3,6 +3,8 @@ import type { PaneState } from "./classify.js";
 /** A classified pane ready for display. */
 export interface Row {
   target: string;
+  /** Stable tmux pane id, used as the tracking key (not shown in the table). */
+  id?: string;
   project: string;
   state: PaneState;
   reason: string;

@@ -66,7 +66,7 @@ function collect(match: RegExp, session: string | undefined): Row[] {
       text = "";
     }
     const { state, reason, category } = classifyPane(text);
-    rows.push({ target: pane.target, project: projectName(pane.path), state, reason, category });
+    rows.push({ target: pane.target, id: pane.id, project: projectName(pane.path), state, reason, category });
   }
   return rows;
 }
@@ -140,18 +140,20 @@ async function main(): Promise<number> {
   for (;;) {
     const rows = build();
     const now = Date.now();
+    // Track by the stable pane id so a re-layout does not reset the timer.
+    const keyOf = (r: Row): string => r.id || r.target;
     tracker = updateTracker(
       tracker,
-      rows.map((r) => ({ key: r.target, state: r.state })),
+      rows.map((r) => ({ key: keyOf(r), state: r.state })),
       now,
     );
     for (const r of rows) {
-      const ms = elapsedMs(tracker, r.target, now);
+      const ms = elapsedMs(tracker, keyOf(r), now);
       if (ms !== undefined) {
         r.age = humanizeDuration(ms);
       }
     }
-    const blocked = new Set(rows.filter((r) => r.state === "blocked").map((r) => r.target));
+    const blocked = new Set(rows.filter((r) => r.state === "blocked").map(keyOf));
     const isNew = [...blocked].some((t) => !prevBlocked.has(t));
     prevBlocked = blocked;
 

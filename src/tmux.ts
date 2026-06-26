@@ -3,8 +3,10 @@
  */
 
 export interface Pane {
-  /** `session:window.pane` target. */
+  /** `session:window.pane` target — human-friendly but changes on re-layout. */
   target: string;
+  /** Stable tmux pane id (e.g. `%37`), used as the identity across refreshes. */
+  id: string;
   /** The pane's foreground command (Claude Code shows its version here). */
   command: string;
   /** The pane's working directory. */
@@ -12,7 +14,8 @@ export interface Pane {
 }
 
 /** The tmux format string fleetwatch lists panes with. */
-export const LIST_FORMAT = "#{session_name}:#{window_index}.#{pane_index}\t#{pane_current_command}\t#{pane_current_path}";
+export const LIST_FORMAT =
+  "#{session_name}:#{window_index}.#{pane_index}\t#{pane_id}\t#{pane_current_command}\t#{pane_current_path}";
 
 /** Parse the tab-separated `tmux list-panes` output into panes. */
 export function parsePaneList(output: string): Pane[] {
@@ -21,9 +24,9 @@ export function parsePaneList(output: string): Pane[] {
     if (line.trim() === "") {
       continue;
     }
-    const [target, command, path] = line.split("\t");
+    const [target, id, command, path] = line.split("\t");
     if (target) {
-      panes.push({ target, command: command ?? "", path: path ?? "" });
+      panes.push({ target, id: id ?? "", command: command ?? "", path: path ?? "" });
     }
   }
   return panes;
