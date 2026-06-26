@@ -18,3 +18,5 @@ export { renderTable, renderJson, sortRows, summarize } from "./render.js";
 
 export type { Sample, Tracker } from "./track.js";
 export { updateTracker, elapsedMs, humanizeDuration } from "./track.js";
+
+export { notifyEnv } from "./notify.js";

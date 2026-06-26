@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 
 import { classifyPane } from "./classify.js";
 import { parsePaneList, isClaudePane, projectName, paneIncluded, DEFAULT_MATCH, LIST_FORMAT } from "./tmux.js";
 import { renderJson, renderTable, summarize, type Row } from "./render.js";
 import { updateTracker, elapsedMs, humanizeDuration, type Tracker } from "./track.js";
+import { notifyEnv } from "./notify.js";
 
 const HELP = `fleetwatch - watch your tmux Claude Code panes
 
@@ -25,6 +26,9 @@ Options:
                       (default: a version like 2.1.193)
   --blocked-only      Show only blocked/error panes
   --bell              Ring the terminal bell when a pane becomes blocked (watch)
+  --notify <command>  Run this shell command when a pane becomes blocked (watch).
+                      Pane details are passed as FW_PROJECT/FW_TARGET/FW_REASON/
+                      FW_CATEGORY/FW_ID env vars (not interpolated)
   --json              Output JSON instead of a table
   --no-color          Disable ANSI colors
   -h, --help          Show this help
@@ -106,6 +110,7 @@ async function main(): Promise<number> {
         exclude: { type: "string" },
         "blocked-only": { type: "boolean", default: false },
         bell: { type: "boolean", default: false },
+        notify: { type: "string" },
         json: { type: "boolean", default: false },
         "no-color": { type: "boolean", default: false },
       },
@@ -171,16 +176,26 @@ async function main(): Promise<number> {
         r.age = humanizeDuration(ms);
       }
     }
-    const blocked = new Set(rows.filter((r) => r.state === "blocked").map(keyOf));
-    const isNew = [...blocked].some((t) => !prevBlocked.has(t));
-    prevBlocked = blocked;
+    const newlyBlocked = rows.filter((r) => r.state === "blocked" && !prevBlocked.has(keyOf(r)));
+    prevBlocked = new Set(rows.filter((r) => r.state === "blocked").map(keyOf));
+
+    // Run the notify hook once per pane that just became blocked.
+    if (values.notify) {
+      for (const r of newlyBlocked) {
+        try {
+          spawn("sh", ["-c", values.notify], { env: { ...process.env, ...notifyEnv(r) }, stdio: "ignore" }).unref();
+        } catch {
+          // A failing notify hook must not stop the watch loop.
+        }
+      }
+    }
 
     if (!values.json) {
       process.stdout.write("\x1b[2J\x1b[H"); // clear screen
       process.stdout.write(`fleetwatch · ${new Date().toLocaleTimeString()} · every ${intervalMs / 1000}s\n\n`);
     }
     process.stdout.write(values.json ? renderJson(rows) : renderTable(rows, color));
-    if (values.bell && isNew && blocked.size > 0) {
+    if (values.bell && newlyBlocked.length > 0) {
       process.stdout.write("\x07");
     }
     await sleep(intervalMs);

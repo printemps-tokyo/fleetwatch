@@ -61,6 +61,7 @@ fleetwatch --json              # machine-readable
 | `--match <regex>` | How Claude panes are detected by command name (default: a version like `2.1.193`) |
 | `--blocked-only` | Show only blocked / error panes |
 | `--bell` | Ring the terminal bell when a pane becomes blocked (watch mode) |
+| `--notify <command>` | Run a shell command when a pane becomes blocked (watch mode) |
 | `--json` | Output JSON instead of a table |
 | `--no-color` | Disable ANSI colors |
 
@@ -68,6 +69,20 @@ In one-shot mode the exit code is `1` when any pane is blocked, so it fits in
 scripts and status bars. In `--watch` mode each row also shows how long the pane
 has held its current state (e.g. `BLOCKED 12m`), so the one stuck longest stands
 out.
+
+### Alerting
+
+In watch mode, `--notify <command>` runs a shell command the moment a pane
+becomes blocked. The pane's details arrive as environment variables
+(`FW_PROJECT`, `FW_TARGET`, `FW_REASON`, `FW_CATEGORY`, `FW_ID`, `FW_STATE`) —
+they are not interpolated into the command, so unusual project names are safe.
+
+```bash
+# macOS desktop notification
+fleetwatch --watch --notify 'terminal-notifier -title "$FW_PROJECT blocked" -message "$FW_REASON"'
+```
+
+fleetwatch only reads panes; the notify command is yours to define.
 
 ## How panes are detected and classified
 
