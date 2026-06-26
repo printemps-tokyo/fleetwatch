@@ -13,9 +13,18 @@
 
 export type PaneState = "working" | "blocked" | "error" | "idle" | "unknown";
 
+/**
+ * A coarse bucket for a blocked pane, for at-a-glance triage across many panes:
+ * `auth` needs you to sign in elsewhere, `confirm` is a quick yes/approve,
+ * `select` is an open menu, and `input` is a free-text question.
+ */
+export type BlockedCategory = "auth" | "confirm" | "select" | "input";
+
 export interface Classification {
   state: PaneState;
   reason: string;
+  /** Set only when `state` is `blocked`. */
+  category?: BlockedCategory;
 }
 
 const FOOTER_LINES = 3;
@@ -25,17 +34,17 @@ const WORKING_RE = /esc to interrupt/i;
 const IDLE_RE = /shift\+tab to cycle|bypass permissions on|\? for shortcuts|\bfor agents\b/i;
 
 /** Interactive prompts that mean a human must respond before the pane proceeds. */
-const BLOCKED_RES: [RegExp, string][] = [
-  [/how would you like to continue\?/i, "selection prompt"],
-  [/do you want to (proceed|continue|create|allow|trust|run|make|delete|overwrite|enable)/i, "confirmation prompt"],
-  [/\bAccept\b\s+\bDecline\b/, "accept/decline prompt"],
-  [/press enter to (continue|confirm|retry)/i, "press-enter prompt"],
-  [/\((y\/n)\)|\[(y\/n|y\/N|Y\/n)\]/i, "yes/no prompt"],
-  [/❯\s*\d+\.\s+\S/, "numbered choice"],
-  [/(↑\/↓|up\/down)\s*(to\s*)?(navigate|select)/i, "open menu"],
-  [/run the command to sign in|to (authenticate|log ?in)\b|sign ?in to continue/i, "sign-in prompt"],
-  [/visit\s+https?:\/\/\S+\s+to\b|open this url|paste .* code/i, "login URL"],
-  [/waiting for (your )?(input|response|confirmation)/i, "awaiting input"],
+const BLOCKED_RES: [RegExp, string, BlockedCategory][] = [
+  [/run the command to sign in|to (authenticate|log ?in)\b|sign ?in to continue/i, "sign-in prompt", "auth"],
+  [/visit\s+https?:\/\/\S+\s+to\b|open this url|paste .* code/i, "login URL", "auth"],
+  [/how would you like to continue\?/i, "selection prompt", "select"],
+  [/❯\s*\d+\.\s+\S/, "numbered choice", "select"],
+  [/(↑\/↓|up\/down)\s*(to\s*)?(navigate|select)/i, "open menu", "select"],
+  [/do you want to (proceed|continue|create|allow|trust|run|make|delete|overwrite|enable)/i, "confirmation prompt", "confirm"],
+  [/\bAccept\b\s+\bDecline\b/, "accept/decline prompt", "confirm"],
+  [/press enter to (continue|confirm|retry)/i, "press-enter prompt", "confirm"],
+  [/\((y\/n)\)|\[(y\/n|y\/N|Y\/n)\]/i, "yes/no prompt", "confirm"],
+  [/waiting for (your )?(input|response|confirmation)/i, "awaiting input", "input"],
 ];
 
 /** Error banners that indicate the pane stalled on a failure. */
@@ -63,9 +72,9 @@ export function classifyPane(text: string): Classification {
   if (WORKING_RE.test(footer)) {
     return { state: "working", reason: "generating" };
   }
-  for (const [re, why] of BLOCKED_RES) {
+  for (const [re, why, category] of BLOCKED_RES) {
     if (re.test(tail)) {
-      return { state: "blocked", reason: why };
+      return { state: "blocked", reason: why, category };
     }
   }
   for (const [re, why] of ERROR_RES) {

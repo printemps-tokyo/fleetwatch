@@ -7,7 +7,7 @@
  * so the behavior is deterministic and unit-tested on real captures.
  */
 
-export type { PaneState, Classification } from "./classify.js";
+export type { PaneState, BlockedCategory, Classification } from "./classify.js";
 export { classifyPane, nonBlankTail } from "./classify.js";
 
 export type { Pane } from "./tmux.js";

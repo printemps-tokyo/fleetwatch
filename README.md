@@ -72,8 +72,9 @@ scripts and status bars.
   Override with `--match` if your setup differs.
 - The captured text is classified, in order:
   - `working` — actively generating (`esc to interrupt` in the footer).
-  - `blocked` — an interactive prompt awaits you: confirmations, `y/n`,
-    numbered menus, "Accept / Decline", sign-in / login URLs.
+  - `blocked` — an interactive prompt awaits you, tagged with a triage
+    category: `auth` (sign-in / login URL), `select` (a menu), `confirm`
+    (yes/no, Accept/Decline, proceed, press-enter), or `input` (a question).
   - `error` — an error banner (API error, rate limit, network, crash).
   - `idle` — the ready input box is shown.
   - `unknown` — a screen with no recognizable markers (e.g. a modal).

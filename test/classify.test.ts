@@ -36,6 +36,16 @@ describe("classifyPane", () => {
     expect(c.state).toBe("blocked");
   });
 
+  it("buckets blocked panes into triage categories", () => {
+    expect(classifyPane(BLOCKED).category).toBe("auth"); // sign-in selection
+    expect(classifyPane(YESNO).category).toBe("select"); // numbered choice
+    expect(classifyPane("  Do you want to proceed?").category).toBe("confirm");
+    expect(classifyPane("  Accept    Decline").category).toBe("confirm");
+    expect(classifyPane("  Visit https://example.com/device to sign in").category).toBe("auth");
+    // Non-blocked panes have no category.
+    expect(classifyPane(WORKING).category).toBeUndefined();
+  });
+
   it("detects a working pane by 'esc to interrupt'", () => {
     expect(classifyPane(WORKING).state).toBe("working");
     expect(classifyPane(WORKING_TASKS).state).toBe("working");

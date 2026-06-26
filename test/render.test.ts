@@ -3,7 +3,7 @@ import { renderTable, renderJson, sortRows, summarize, type Row } from "../src/r
 
 const rows: Row[] = [
   { target: "7:9.1", project: "p5js", state: "working", reason: "generating" },
-  { target: "7:12.1", project: "rive", state: "blocked", reason: "sign-in prompt" },
+  { target: "7:12.1", project: "rive", state: "blocked", reason: "sign-in prompt", category: "auth" },
   { target: "7:7.1", project: "printemps.tokyo", state: "idle", reason: "waiting for input" },
 ];
 
@@ -19,6 +19,7 @@ describe("renderTable", () => {
     const out = renderTable(rows, false);
     expect(out).toContain("rive");
     expect(out).toContain("BLOCKED");
+    expect(out).toContain("[auth] sign-in prompt");
     expect(out).toContain("3 panes");
     expect(out).toContain("1 BLOCKED");
     expect(out).not.toContain("\x1b[");

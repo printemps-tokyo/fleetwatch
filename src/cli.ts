@@ -64,8 +64,8 @@ function collect(match: RegExp, session: string | undefined): Row[] {
     } catch {
       text = "";
     }
-    const { state, reason } = classifyPane(text);
-    rows.push({ target: pane.target, project: projectName(pane.path), state, reason });
+    const { state, reason, category } = classifyPane(text);
+    rows.push({ target: pane.target, project: projectName(pane.path), state, reason, category });
   }
   return rows;
 }

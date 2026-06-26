@@ -6,6 +6,8 @@ export interface Row {
   project: string;
   state: PaneState;
   reason: string;
+  /** Blocked-pane triage bucket (auth / confirm / select / input). */
+  category?: string;
 }
 
 const COLORS: Record<string, string> = {
@@ -59,7 +61,8 @@ export function renderTable(rows: Row[], color: boolean): string {
   const lines: string[] = [];
   for (const r of sorted) {
     const state = color ? `${STATE_COLOR[r.state]}${pad(r.state.toUpperCase(), 8)}${COLORS.reset}` : pad(r.state.toUpperCase(), 8);
-    lines.push(`${pad(r.target, tw)}  ${pad(r.project, pw)}  ${state}  ${r.reason}`);
+    const detail = r.category ? `[${r.category}] ${r.reason}` : r.reason;
+    lines.push(`${pad(r.target, tw)}  ${pad(r.project, pw)}  ${state}  ${detail}`);
   }
 
   const c = summarize(sorted);
