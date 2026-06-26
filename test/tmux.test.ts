@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePaneList, isClaudePane, projectName } from "../src/tmux.js";
+import { parsePaneList, isClaudePane, projectName, paneIncluded } from "../src/tmux.js";
 
 describe("parsePaneList", () => {
   it("parses tab-separated target/id/command/path", () => {
@@ -37,5 +37,23 @@ describe("projectName", () => {
   it("returns the last path segment", () => {
     expect(projectName("/Users/me/srv/projects/ai_cursor/rive")).toBe("rive");
     expect(projectName("/")).toBe("/");
+  });
+});
+
+describe("paneIncluded", () => {
+  const p = "/Users/me/srv/projects/ai_cursor/p5js";
+  it("keeps everything with no filters", () => {
+    expect(paneIncluded(p, {})).toBe(true);
+  });
+  it("keeps only paths matching --filter", () => {
+    expect(paneIncluded(p, { filter: /ai_cursor/ })).toBe(true);
+    expect(paneIncluded(p, { filter: /media-/ })).toBe(false);
+  });
+  it("drops paths matching --exclude", () => {
+    expect(paneIncluded(p, { exclude: /p5js/ })).toBe(false);
+    expect(paneIncluded(p, { exclude: /rive/ })).toBe(true);
+  });
+  it("applies exclude before filter", () => {
+    expect(paneIncluded(p, { filter: /ai_cursor/, exclude: /p5js/ })).toBe(false);
   });
 });

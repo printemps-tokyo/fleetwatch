@@ -45,3 +45,17 @@ export function projectName(path: string): string {
   const parts = path.split("/").filter(Boolean);
   return parts.length > 0 ? (parts[parts.length - 1] as string) : path || "?";
 }
+
+/**
+ * Whether a pane's path passes the filters: dropped if it matches `exclude`,
+ * and (when `filter` is set) kept only if it matches `filter`. Pure.
+ */
+export function paneIncluded(path: string, opts: { filter?: RegExp; exclude?: RegExp }): boolean {
+  if (opts.exclude && opts.exclude.test(path)) {
+    return false;
+  }
+  if (opts.filter && !opts.filter.test(path)) {
+    return false;
+  }
+  return true;
+}

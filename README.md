@@ -56,6 +56,8 @@ fleetwatch --json              # machine-readable
 | --- | --- |
 | `--watch [secs]` | Refresh continuously (default 5s) |
 | `--session <name>` | Only panes in this tmux session |
+| `--filter <regex>` | Only panes whose path matches this regex |
+| `--exclude <regex>` | Skip panes whose path matches this regex |
 | `--match <regex>` | How Claude panes are detected by command name (default: a version like `2.1.193`) |
 | `--blocked-only` | Show only blocked / error panes |
 | `--bell` | Ring the terminal bell when a pane becomes blocked (watch mode) |

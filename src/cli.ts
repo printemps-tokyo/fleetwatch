@@ -3,7 +3,7 @@ import { parseArgs } from "node:util";
 import { execFileSync } from "node:child_process";
 
 import { classifyPane } from "./classify.js";
-import { parsePaneList, isClaudePane, projectName, DEFAULT_MATCH, LIST_FORMAT } from "./tmux.js";
+import { parsePaneList, isClaudePane, projectName, paneIncluded, DEFAULT_MATCH, LIST_FORMAT } from "./tmux.js";
 import { renderJson, renderTable, summarize, type Row } from "./render.js";
 import { updateTracker, elapsedMs, humanizeDuration, type Tracker } from "./track.js";
 
@@ -19,6 +19,8 @@ permission/sign-in prompt does not go unnoticed.
 Options:
   --watch [secs]      Refresh continuously (default interval: 5s)
   --session <name>    Only panes in this tmux session
+  --filter <regex>    Only panes whose path matches this regex
+  --exclude <regex>   Skip panes whose path matches this regex
   --match <regex>     Override how Claude panes are detected by command name
                       (default: a version like 2.1.193)
   --blocked-only      Show only blocked/error panes
@@ -49,7 +51,11 @@ function tmux(args: string[]): string {
 }
 
 /** Capture and classify the Claude Code panes into display rows. */
-function collect(match: RegExp, session: string | undefined): Row[] {
+function collect(
+  match: RegExp,
+  session: string | undefined,
+  paneFilter: { filter?: RegExp; exclude?: RegExp },
+): Row[] {
   const list = tmux(["list-panes", "-a", "-F", LIST_FORMAT]);
   const rows: Row[] = [];
   for (const pane of parsePaneList(list)) {
@@ -57,6 +63,9 @@ function collect(match: RegExp, session: string | undefined): Row[] {
       continue;
     }
     if (session && !pane.target.startsWith(`${session}:`)) {
+      continue;
+    }
+    if (!paneIncluded(pane.path, paneFilter)) {
       continue;
     }
     let text = "";
@@ -93,6 +102,8 @@ async function main(): Promise<number> {
         watch: { type: "string" },
         session: { type: "string" },
         match: { type: "string" },
+        filter: { type: "string" },
+        exclude: { type: "string" },
         "blocked-only": { type: "boolean", default: false },
         bell: { type: "boolean", default: false },
         json: { type: "boolean", default: false },
@@ -105,13 +116,20 @@ async function main(): Promise<number> {
   }
 
   let match = DEFAULT_MATCH;
-  if (values.match) {
-    try {
+  const paneFilter: { filter?: RegExp; exclude?: RegExp } = {};
+  try {
+    if (values.match) {
       match = new RegExp(values.match);
-    } catch (err) {
-      process.stderr.write(`error: invalid --match regex: ${(err as Error).message}\n`);
-      return 1;
     }
+    if (values.filter) {
+      paneFilter.filter = new RegExp(values.filter);
+    }
+    if (values.exclude) {
+      paneFilter.exclude = new RegExp(values.exclude);
+    }
+  } catch (err) {
+    process.stderr.write(`error: invalid regex: ${(err as Error).message}\n`);
+    return 1;
   }
   const color = !values["no-color"] && !process.env.NO_COLOR && process.stdout.isTTY === true;
   const watching = values.watch !== undefined;
@@ -120,7 +138,7 @@ async function main(): Promise<number> {
   const build = (): Row[] => {
     let rows: Row[];
     try {
-      rows = collect(match, values.session);
+      rows = collect(match, values.session, paneFilter);
     } catch (err) {
       process.stderr.write(`error: cannot talk to tmux (${(err as Error).message})\n`);
       process.exit(1);
