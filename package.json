@@ -1,0 +1,51 @@
+{
+  "name": "@printemps-tokyo/fleetwatch",
+  "version": "0.1.0",
+  "description": "Watch your tmux Claude Code panes and surface the ones that are blocked waiting for input. Zero-dependency CLI.",
+  "type": "module",
+  "license": "MIT",
+  "author": "printemps.tokyo <develop@printemps.tokyo>",
+  "homepage": "https://github.com/printemps-tokyo/fleetwatch#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/printemps-tokyo/fleetwatch.git"
+  },
+  "bugs": {
+    "url": "https://github.com/printemps-tokyo/fleetwatch/issues"
+  },
+  "keywords": [
+    "tmux",
+    "claude-code",
+    "monitor",
+    "agents",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "fleetwatch": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.0.0"
+  }
+}
