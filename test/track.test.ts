@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { updateTracker, elapsedMs, humanizeDuration, type Tracker } from "../src/track.js";
+import { updateTracker, elapsedMs, humanizeDuration, parseDuration, type Tracker } from "../src/track.js";
 
 describe("updateTracker", () => {
   it("stamps new panes with the current time", () => {
@@ -34,5 +34,15 @@ describe("humanizeDuration", () => {
     expect(humanizeDuration(12 * 60_000)).toBe("12m");
     expect(humanizeDuration(63 * 60_000)).toBe("1h3m");
     expect(humanizeDuration(120 * 60_000)).toBe("2h");
+  });
+});
+
+describe("parseDuration", () => {
+  it("parses s/m/h, defaulting a bare number to minutes", () => {
+    expect(parseDuration("90s")).toBe(90_000);
+    expect(parseDuration("10m")).toBe(600_000);
+    expect(parseDuration("1h")).toBe(3_600_000);
+    expect(parseDuration("10")).toBe(600_000);
+    expect(() => parseDuration("soon")).toThrow();
   });
 });

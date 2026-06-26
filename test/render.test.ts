@@ -33,6 +33,17 @@ describe("renderTable", () => {
     const withAge: Row[] = [{ target: "7:12.1", project: "rive", state: "blocked", reason: "sign-in prompt", category: "auth", age: "12m" }];
     expect(renderTable(withAge, false)).toContain("12m");
   });
+
+  it("annotates and prioritizes a stuck pane", () => {
+    const rs: Row[] = [
+      { target: "7:1.1", project: "a", state: "idle", reason: "waiting for input" },
+      { target: "7:2.1", project: "b", state: "working", reason: "generating", age: "15m", stuck: true },
+    ];
+    const out = renderTable(rs, false);
+    expect(out).toContain("no output for 15m");
+    // The stuck pane sorts above the healthy idle one.
+    expect(out.indexOf("7:2.1")).toBeLessThan(out.indexOf("7:1.1"));
+  });
 });
 
 describe("renderJson", () => {

@@ -5,7 +5,8 @@ import { execFileSync, spawn } from "node:child_process";
 import { classifyPane } from "./classify.js";
 import { parsePaneList, isClaudePane, projectName, paneIncluded, DEFAULT_MATCH, LIST_FORMAT } from "./tmux.js";
 import { renderJson, renderTable, summarize, type Row } from "./render.js";
-import { updateTracker, elapsedMs, humanizeDuration, type Tracker } from "./track.js";
+import { updateTracker, elapsedMs, humanizeDuration, parseDuration, type Tracker } from "./track.js";
+import { hashText, updateActivity, quietMs, type ActivityTracker } from "./activity.js";
 import { notifyEnv } from "./notify.js";
 
 const HELP = `fleetwatch - watch your tmux Claude Code panes
@@ -25,6 +26,9 @@ Options:
   --match <regex>     Override how Claude panes are detected by command name
                       (default: a version like 2.1.193)
   --blocked-only      Show only blocked/error panes
+  --stuck <duration>  Flag a pane whose output has not changed for this long
+                      (watch mode; e.g. 90s, 10m, 1h). Catches silent hangs that
+                      the prompt classifier cannot recognize.
   --bell              Ring the terminal bell when a pane becomes blocked (watch)
   --notify <command>  Run this shell command when a pane becomes blocked (watch).
                       Pane details are passed as FW_PROJECT/FW_TARGET/FW_REASON/
@@ -55,13 +59,20 @@ function tmux(args: string[]): string {
 }
 
 /** Capture and classify the Claude Code panes into display rows. */
+interface Snapshot {
+  rows: Row[];
+  /** key (pane id) -> captured-text hash, for stuck detection. */
+  hashes: Map<string, string>;
+}
+
 function collect(
   match: RegExp,
   session: string | undefined,
   paneFilter: { filter?: RegExp; exclude?: RegExp },
-): Row[] {
+): Snapshot {
   const list = tmux(["list-panes", "-a", "-F", LIST_FORMAT]);
   const rows: Row[] = [];
+  const hashes = new Map<string, string>();
   for (const pane of parsePaneList(list)) {
     if (!isClaudePane(pane.command, match)) {
       continue;
@@ -79,9 +90,11 @@ function collect(
       text = "";
     }
     const { state, reason, category } = classifyPane(text);
-    rows.push({ target: pane.target, id: pane.id, project: projectName(pane.path), state, reason, category });
+    const row: Row = { target: pane.target, id: pane.id, project: projectName(pane.path), state, reason, category };
+    rows.push(row);
+    hashes.set(pane.id || pane.target, hashText(text));
   }
-  return rows;
+  return { rows, hashes };
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -109,6 +122,7 @@ async function main(): Promise<number> {
         filter: { type: "string" },
         exclude: { type: "string" },
         "blocked-only": { type: "boolean", default: false },
+        stuck: { type: "string" },
         bell: { type: "boolean", default: false },
         notify: { type: "string" },
         json: { type: "boolean", default: false },
@@ -136,52 +150,68 @@ async function main(): Promise<number> {
     process.stderr.write(`error: invalid regex: ${(err as Error).message}\n`);
     return 1;
   }
+
+  let stuckMs: number | undefined;
+  try {
+    stuckMs = values.stuck ? parseDuration(values.stuck) : undefined;
+  } catch (err) {
+    process.stderr.write(`error: ${(err as Error).message}\n`);
+    return 1;
+  }
   const color = !values["no-color"] && !process.env.NO_COLOR && process.stdout.isTTY === true;
   const watching = values.watch !== undefined;
   const intervalMs = Math.max(1, values.watch ? Number(values.watch) || 5 : 5) * 1000;
 
-  const build = (): Row[] => {
-    let rows: Row[];
+  const build = (): Snapshot => {
+    let snap: Snapshot;
     try {
-      rows = collect(match, values.session, paneFilter);
+      snap = collect(match, values.session, paneFilter);
     } catch (err) {
       process.stderr.write(`error: cannot talk to tmux (${(err as Error).message})\n`);
       process.exit(1);
     }
-    return values["blocked-only"] ? rows.filter((r) => r.state === "blocked" || r.state === "error") : rows;
+    if (values["blocked-only"]) {
+      snap.rows = snap.rows.filter((r) => r.state === "blocked" || r.state === "error");
+    }
+    return snap;
   };
 
   if (!watching) {
-    const rows = build();
+    const { rows } = build();
     process.stdout.write(values.json ? renderJson(rows, new Date().toISOString()) : renderTable(rows, color));
     return summarize(rows).blocked > 0 ? 1 : 0;
   }
 
-  // Watch mode: refresh until interrupted, ringing the bell on newly-blocked panes.
-  let prevBlocked = new Set<string>();
+  // Watch mode: refresh until interrupted, alerting on newly-blocked/stuck panes.
+  const keyOf = (r: Row): string => r.id || r.target;
+  let prevAlerting = new Set<string>();
   let tracker: Tracker = new Map();
+  let activity: ActivityTracker = new Map();
   for (;;) {
-    const rows = build();
+    const { rows, hashes } = build();
     const now = Date.now();
-    // Track by the stable pane id so a re-layout does not reset the timer.
-    const keyOf = (r: Row): string => r.id || r.target;
-    tracker = updateTracker(
-      tracker,
-      rows.map((r) => ({ key: keyOf(r), state: r.state })),
-      now,
-    );
+
+    // Track time-in-state (for "12m") and output quiescence (for --stuck).
+    tracker = updateTracker(tracker, rows.map((r) => ({ key: keyOf(r), state: r.state })), now);
+    activity = updateActivity(activity, [...hashes].map(([key, hash]) => ({ key, hash })), now);
     for (const r of rows) {
       const ms = elapsedMs(tracker, keyOf(r), now);
       if (ms !== undefined) {
         r.age = humanizeDuration(ms);
       }
+      if (stuckMs !== undefined && (r.state === "working" || r.state === "unknown")) {
+        const quiet = quietMs(activity, keyOf(r), now);
+        r.stuck = quiet !== undefined && quiet >= stuckMs;
+      }
     }
-    const newlyBlocked = rows.filter((r) => r.state === "blocked" && !prevBlocked.has(keyOf(r)));
-    prevBlocked = new Set(rows.filter((r) => r.state === "blocked").map(keyOf));
 
-    // Run the notify hook once per pane that just became blocked.
+    // Panes needing attention: blocked, or stuck past the threshold.
+    const alerting = rows.filter((r) => r.state === "blocked" || r.stuck === true);
+    const newlyAlerting = alerting.filter((r) => !prevAlerting.has(keyOf(r)));
+    prevAlerting = new Set(alerting.map(keyOf));
+
     if (values.notify) {
-      for (const r of newlyBlocked) {
+      for (const r of newlyAlerting) {
         try {
           spawn("sh", ["-c", values.notify], { env: { ...process.env, ...notifyEnv(r) }, stdio: "ignore" }).unref();
         } catch {
@@ -195,7 +225,7 @@ async function main(): Promise<number> {
       process.stdout.write(`fleetwatch · ${new Date().toLocaleTimeString()} · every ${intervalMs / 1000}s\n\n`);
     }
     process.stdout.write(values.json ? renderJson(rows, new Date().toISOString()) : renderTable(rows, color));
-    if (values.bell && newlyBlocked.length > 0) {
+    if (values.bell && newlyAlerting.length > 0) {
       process.stdout.write("\x07");
     }
     await sleep(intervalMs);

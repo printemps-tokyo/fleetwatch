@@ -12,6 +12,8 @@ export interface Row {
   category?: string;
   /** How long the pane has held this state (watch mode only), e.g. "12m". */
   age?: string;
+  /** True when the pane's output has been unchanged past the --stuck threshold. */
+  stuck?: boolean;
 }
 
 const COLORS: Record<string, string> = {
@@ -38,11 +40,17 @@ function pad(text: string, width: number): string {
   return text.length >= width ? text : text + " ".repeat(width - text.length);
 }
 
+/** A stuck working/unknown pane is more urgent than a healthy one. */
+function urgency(r: Row): number {
+  if (r.stuck && r.state !== "blocked" && r.state !== "error") {
+    return 1.5; // between error (1) and idle (2)
+  }
+  return STATE_ORDER[r.state];
+}
+
 /** Sort rows by urgency, then by target. */
 export function sortRows(rows: Row[]): Row[] {
-  return [...rows].sort(
-    (a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state] || a.target.localeCompare(b.target),
-  );
+  return [...rows].sort((a, b) => urgency(a) - urgency(b) || a.target.localeCompare(b.target));
 }
 
 /** Count rows per state. */
@@ -67,7 +75,8 @@ export function renderTable(rows: Row[], color: boolean): string {
   for (const r of sorted) {
     const state = color ? `${STATE_COLOR[r.state]}${pad(r.state.toUpperCase(), 8)}${COLORS.reset}` : pad(r.state.toUpperCase(), 8);
     const age = aw > 0 ? `  ${pad(r.age ?? "", aw)}` : "";
-    const detail = r.category ? `[${r.category}] ${r.reason}` : r.reason;
+    const base = r.category ? `[${r.category}] ${r.reason}` : r.reason;
+    const detail = r.stuck ? `${base} — no output for ${r.age ?? "a while"}` : base;
     lines.push(`${pad(r.target, tw)}  ${pad(r.project, pw)}  ${state}${age}  ${detail}`);
   }
 

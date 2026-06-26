@@ -60,6 +60,7 @@ fleetwatch --json              # machine-readable
 | `--exclude <regex>` | Skip panes whose path matches this regex |
 | `--match <regex>` | How Claude panes are detected by command name (default: a version like `2.1.193`) |
 | `--blocked-only` | Show only blocked / error panes |
+| `--stuck <duration>` | Flag a pane whose output has not changed for this long, e.g. `10m` (watch mode) |
 | `--bell` | Ring the terminal bell when a pane becomes blocked (watch mode) |
 | `--notify <command>` | Run a shell command when a pane becomes blocked (watch mode) |
 | `--json` | Output JSON instead of a table |
@@ -100,6 +101,12 @@ fleetwatch only reads panes; the notify command is yours to define.
 
 Detection is heuristic and tuned to the Claude Code TUI; it may need updating as
 that UI evolves. Contributions of new prompt signatures are welcome.
+
+Because a wedged pane can also stall in a way no prompt signature matches,
+`--watch --stuck 10m` additionally flags any `working`/`unknown` pane whose
+captured output has not changed for the given duration (shown as
+`no output for 12m`). Stuck panes sort to the top and trigger `--bell` /
+`--notify` like blocked ones.
 
 ## Programmatic API
 

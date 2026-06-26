@@ -17,6 +17,9 @@ export type { Row } from "./render.js";
 export { renderTable, renderJson, sortRows, summarize } from "./render.js";
 
 export type { Sample, Tracker } from "./track.js";
-export { updateTracker, elapsedMs, humanizeDuration } from "./track.js";
+export { updateTracker, elapsedMs, humanizeDuration, parseDuration } from "./track.js";
+
+export type { ActivitySample, ActivityTracker } from "./activity.js";
+export { hashText, updateActivity, quietMs } from "./activity.js";
 
 export { notifyEnv } from "./notify.js";
