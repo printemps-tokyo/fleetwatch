@@ -8,6 +8,7 @@ import { renderJson, renderTable, summarize, type Row } from "./render.js";
 import { updateTracker, elapsedMs, humanizeDuration, parseDuration, type Tracker } from "./track.js";
 import { hashText, updateActivity, quietMs, type ActivityTracker } from "./activity.js";
 import { notifyEnv } from "./notify.js";
+import { normalizeWatchArgv } from "./args.js";
 
 const HELP = `fleetwatch - watch your tmux Claude Code panes
 
@@ -113,7 +114,9 @@ async function main(): Promise<number> {
   let values;
   try {
     values = parseArgs({
-      args: argv,
+      // parseArgs cannot express an optional option value, so `--watch`
+      // without a number gets the default interval injected up front.
+      args: normalizeWatchArgv(argv),
       allowPositionals: false,
       options: {
         watch: { type: "string" },
