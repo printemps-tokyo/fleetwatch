@@ -8,7 +8,7 @@ import { renderJson, renderTable, summarize, type Row } from "./render.js";
 import { updateTracker, elapsedMs, humanizeDuration, parseDuration, type Tracker } from "./track.js";
 import { hashText, updateActivity, quietMs, type ActivityTracker } from "./activity.js";
 import { notifyEnv } from "./notify.js";
-import { normalizeWatchArgv } from "./args.js";
+import { normalizeWatchArgv, parseWatchSecs } from "./args.js";
 
 const HELP = `fleetwatch - watch your tmux Claude Code panes
 
@@ -162,8 +162,15 @@ async function main(): Promise<number> {
     return 1;
   }
   const color = !values["no-color"] && !process.env.NO_COLOR && process.stdout.isTTY === true;
-  const watching = values.watch !== undefined;
-  const intervalMs = Math.max(1, values.watch ? Number(values.watch) || 5 : 5) * 1000;
+  let watchSecs: number | undefined;
+  try {
+    watchSecs = values.watch === undefined ? undefined : parseWatchSecs(values.watch);
+  } catch (err) {
+    process.stderr.write(`error: ${(err as Error).message}\n`);
+    return 1;
+  }
+  const watching = watchSecs !== undefined;
+  const intervalMs = (watchSecs ?? 5) * 1000;
 
   const build = (): Snapshot => {
     let snap: Snapshot;
