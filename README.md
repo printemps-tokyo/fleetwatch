@@ -25,7 +25,7 @@ changes anything. The classifier is a pure function tested on real captures.
 
 ## Requirements
 
-- Node.js >= 20
+- Node.js >= 22
 - `tmux`
 
 ## Install
