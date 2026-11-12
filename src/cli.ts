@@ -84,7 +84,7 @@ function collect(
     if (!paneIncluded(pane.path, paneFilter)) {
       continue;
     }
-    let text = "";
+    let text: string;
     try {
       text = tmux(["capture-pane", "-p", "-t", pane.target]);
     } catch {
