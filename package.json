@@ -1,6 +1,6 @@
 {
   "name": "@printemps-tokyo/fleetwatch",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Watch your tmux Claude Code panes and surface the ones that are blocked waiting for input. Zero-dependency CLI.",
   "type": "module",
   "license": "MIT",

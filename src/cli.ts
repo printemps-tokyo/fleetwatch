@@ -2,22 +2,22 @@
 import { parseArgs } from "node:util";
 import { execFileSync, spawn } from "node:child_process";
 
-import { classifyPane } from "./classify.js";
-import { parsePaneList, isClaudePane, projectName, paneIncluded, DEFAULT_MATCH, LIST_FORMAT } from "./tmux.js";
+import { AGENTS, classifyPane, detectAgent, mayBeAgent, type Agent } from "./classify.js";
+import { parsePaneList, projectName, paneIncluded, DEFAULT_MATCH, LIST_FORMAT } from "./tmux.js";
 import { renderJson, renderTable, summarize, type Row } from "./render.js";
 import { updateTracker, elapsedMs, humanizeDuration, parseDuration, type Tracker } from "./track.js";
 import { hashText, updateActivity, quietMs, type ActivityTracker } from "./activity.js";
-import { notifyEnv } from "./notify.js";
+import { macNotificationScript, notifyEnv } from "./notify.js";
 import { normalizeWatchArgv, parseWatchSecs } from "./args.js";
 
-const HELP = `fleetwatch - watch your tmux Claude Code panes
+const HELP = `fleetwatch - watch your tmux coding-agent panes (Claude Code, Codex, Gemini CLI)
 
 Usage:
   fleetwatch [options]
 
-Lists every Claude Code pane in your tmux server and classifies it as working,
-idle, blocked (waiting for input), or error — so a pane silently stuck on a
-permission/sign-in prompt does not go unnoticed.
+Lists every Claude Code, Codex and Gemini CLI pane in your tmux server and
+classifies it as working, idle, blocked (waiting for input), or error — so a
+pane silently stuck on a permission/sign-in prompt does not go unnoticed.
 
 Options:
   --watch [secs]      Refresh continuously (default interval: 5s)
@@ -26,6 +26,7 @@ Options:
   --exclude <regex>   Skip panes whose path matches this regex
   --match <regex>     Override how Claude panes are detected by command name
                       (default: a version like 2.1.193)
+  --agents <list>     Which agents to watch: claude,codex,gemini (default: all)
   --blocked-only      Show only blocked/error panes
   --stuck <duration>  Flag a pane whose output has not changed for this long
                       (watch mode; e.g. 90s, 10m, 1h). Catches silent hangs that
@@ -34,6 +35,8 @@ Options:
   --notify <command>  Run this shell command when a pane becomes blocked (watch).
                       Pane details are passed as FW_PROJECT/FW_TARGET/FW_REASON/
                       FW_CATEGORY/FW_ID env vars (not interpolated)
+  --notify-macos      Show a macOS Notification Center alert when a pane
+                      becomes blocked or stuck (watch)
   --json              Output JSON instead of a table
   --no-color          Disable ANSI colors
   -h, --help          Show this help
@@ -70,12 +73,13 @@ function collect(
   match: RegExp,
   session: string | undefined,
   paneFilter: { filter?: RegExp; exclude?: RegExp },
+  agents: readonly Agent[] = AGENTS,
 ): Snapshot {
   const list = tmux(["list-panes", "-a", "-F", LIST_FORMAT]);
   const rows: Row[] = [];
   const hashes = new Map<string, string>();
   for (const pane of parsePaneList(list)) {
-    if (!isClaudePane(pane.command, match)) {
+    if (!mayBeAgent(pane.command, match)) {
       continue;
     }
     if (session && !pane.target.startsWith(`${session}:`)) {
@@ -90,8 +94,12 @@ function collect(
     } catch {
       text = "";
     }
+    const agent = detectAgent(pane.command, text, match);
+    if (!agent || !agents.includes(agent)) {
+      continue;
+    }
     const { state, reason, category } = classifyPane(text);
-    const row: Row = { target: pane.target, id: pane.id, project: projectName(pane.path), state, reason, category };
+    const row: Row = { target: pane.target, id: pane.id, project: projectName(pane.path), agent, state, reason, category };
     rows.push(row);
     hashes.set(pane.id || pane.target, hashText(text));
   }
@@ -128,6 +136,8 @@ async function main(): Promise<number> {
         stuck: { type: "string" },
         bell: { type: "boolean", default: false },
         notify: { type: "string" },
+        "notify-macos": { type: "boolean", default: false },
+        agents: { type: "string" },
         json: { type: "boolean", default: false },
         "no-color": { type: "boolean", default: false },
       },
@@ -155,6 +165,21 @@ async function main(): Promise<number> {
     return 1;
   }
 
+  let agents: readonly Agent[] = AGENTS;
+  if (values.agents !== undefined) {
+    const picked = values.agents.split(",").map((a) => a.trim()).filter((a) => a !== "");
+    const bad = picked.find((a) => !(AGENTS as readonly string[]).includes(a));
+    if (bad !== undefined || picked.length === 0) {
+      process.stderr.write(`error: --agents takes a comma list of ${AGENTS.join(", ")} (got "${values.agents}")\n`);
+      return 1;
+    }
+    agents = picked as Agent[];
+  }
+  if (values["notify-macos"] && process.platform !== "darwin") {
+    process.stderr.write("error: --notify-macos works on macOS only; use --notify with your desktop's notifier\n");
+    return 1;
+  }
+
   let stuckMs: number | undefined;
   try {
     stuckMs = values.stuck ? parseDuration(values.stuck) : undefined;
@@ -176,7 +201,7 @@ async function main(): Promise<number> {
   const build = (): Snapshot => {
     let snap: Snapshot;
     try {
-      snap = collect(match, values.session, paneFilter);
+      snap = collect(match, values.session, paneFilter, agents);
     } catch (err) {
       process.stderr.write(`error: cannot talk to tmux (${(err as Error).message})\n`);
       process.exit(1);
@@ -236,6 +261,15 @@ async function main(): Promise<number> {
       process.stdout.write(`fleetwatch · ${new Date().toLocaleTimeString()} · every ${intervalMs / 1000}s\n\n`);
     }
     process.stdout.write(values.json ? renderJson(rows, new Date().toISOString()) : renderTable(rows, color));
+    if (values["notify-macos"]) {
+      for (const r of newlyAlerting) {
+        try {
+          spawn("osascript", ["-e", macNotificationScript(r)], { stdio: "ignore" }).unref();
+        } catch {
+          // A failing notification must not stop the watch loop.
+        }
+      }
+    }
     if (values.bell && newlyAlerting.length > 0) {
       process.stdout.write("\x07");
     }

@@ -16,8 +16,26 @@ export function notifyEnv(row: Row): Record<string, string> {
     FW_TARGET: row.target,
     FW_ID: row.id ?? "",
     FW_PROJECT: row.project,
+    FW_AGENT: row.agent ?? "claude",
     FW_STATE: row.state,
     FW_REASON: row.reason,
     FW_CATEGORY: row.category ?? "",
   };
+}
+
+/** A string literal for AppleScript: backslashes and double quotes escaped. */
+export function appleScriptString(text: string): string {
+  return `"${text.replace(/[\\"]/g, (c) => `\\${c}`).replace(/[\r\n]+/g, " ")}"`;
+}
+
+/**
+ * The AppleScript for a macOS Notification Center alert about one pane,
+ * run with `osascript -e`. Pane details are inside escaped string literals,
+ * so they cannot change the script.
+ */
+export function macNotificationScript(row: Row): string {
+  const what = row.stuck ? "no output for a while" : row.category ? `[${row.category}] ${row.reason}` : row.reason;
+  const title = `fleetwatch: ${row.project} needs you`;
+  const subtitle = `${row.agent ?? "claude"} in ${row.target}`;
+  return `display notification ${appleScriptString(what)} with title ${appleScriptString(title)} subtitle ${appleScriptString(subtitle)}`;
 }

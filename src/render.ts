@@ -6,6 +6,8 @@ export interface Row {
   /** Stable tmux pane id, used as the tracking key (not shown in the table). */
   id?: string;
   project: string;
+  /** Which coding agent runs in the pane (claude / codex / gemini). */
+  agent?: string;
   state: PaneState;
   reason: string;
   /** Blocked-pane triage bucket (auth / confirm / select / input). */
@@ -65,19 +67,23 @@ export function summarize(rows: Row[]): Record<PaneState, number> {
 /** Render the classified panes as a table. */
 export function renderTable(rows: Row[], color: boolean): string {
   if (rows.length === 0) {
-    return "no Claude Code panes found\n";
+    return "no coding-agent panes found (Claude Code, Codex, Gemini CLI)\n";
   }
   const sorted = sortRows(rows);
   const tw = Math.max(6, ...sorted.map((r) => r.target.length));
   const pw = Math.max(7, ...sorted.map((r) => r.project.length));
   const aw = Math.max(0, ...sorted.map((r) => (r.age ?? "").length));
+  // The agent column only appears when more than one kind of agent is shown.
+  const agents = new Set(sorted.map((r) => r.agent ?? "claude"));
+  const gw = agents.size > 1 ? Math.max(5, ...sorted.map((r) => (r.agent ?? "claude").length)) : 0;
   const lines: string[] = [];
   for (const r of sorted) {
     const state = color ? `${STATE_COLOR[r.state]}${pad(r.state.toUpperCase(), 8)}${COLORS.reset}` : pad(r.state.toUpperCase(), 8);
     const age = aw > 0 ? `  ${pad(r.age ?? "", aw)}` : "";
     const base = r.category ? `[${r.category}] ${r.reason}` : r.reason;
     const detail = r.stuck ? `${base} — no output for ${r.age ?? "a while"}` : base;
-    lines.push(`${pad(r.target, tw)}  ${pad(r.project, pw)}  ${state}${age}  ${detail}`);
+    const agent = gw > 0 ? `${pad(r.agent ?? "claude", gw)}  ` : "";
+    lines.push(`${pad(r.target, tw)}  ${pad(r.project, pw)}  ${agent}${state}${age}  ${detail}`);
   }
 
   const c = summarize(sorted);

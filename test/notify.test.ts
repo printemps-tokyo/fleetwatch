@@ -19,6 +19,7 @@ describe("notifyEnv", () => {
       FW_STATE: "blocked",
       FW_REASON: "sign-in prompt",
       FW_CATEGORY: "auth",
+      FW_AGENT: "claude",
     });
   });
 

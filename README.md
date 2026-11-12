@@ -1,11 +1,11 @@
 # fleetwatch
 
-> Watch your tmux Claude Code panes and surface the ones blocked waiting for input. Zero-dependency CLI.
+> Watch your tmux coding-agent panes (Claude Code, Codex, Gemini CLI) and surface the ones blocked waiting for input. Zero-dependency CLI.
 
 [![CI](https://github.com/printemps-tokyo/fleetwatch/actions/workflows/ci.yml/badge.svg)](https://github.com/printemps-tokyo/fleetwatch/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-When you run many Claude Code instances in parallel across tmux panes, one will
+When you run many Claude Code (or Codex, or Gemini CLI) instances in parallel across tmux panes, one will
 occasionally stall on a permission prompt, a selection menu, or an MCP sign-in —
 and it is easy to miss among a dozen panes. `fleetwatch` scans your tmux server
 and tells you which panes are working, idle, blocked, or errored.
@@ -75,13 +75,21 @@ out.
 
 In watch mode, `--notify <command>` runs a shell command the moment a pane
 becomes blocked. The pane's details arrive as environment variables
-(`FW_PROJECT`, `FW_TARGET`, `FW_REASON`, `FW_CATEGORY`, `FW_ID`, `FW_STATE`) —
+(`FW_PROJECT`, `FW_AGENT`, `FW_TARGET`, `FW_REASON`, `FW_CATEGORY`, `FW_ID`, `FW_STATE`) —
 they are not interpolated into the command, so unusual project names are safe.
 
 ```bash
-# macOS desktop notification
+# macOS Notification Center, built in (uses osascript; nothing to install)
+fleetwatch --watch --notify-macos
+
+# or any notifier of your own
 fleetwatch --watch --notify 'terminal-notifier -title "$FW_PROJECT blocked" -message "$FW_REASON"'
 ```
+
+`--notify-macos` shows "fleetwatch: <project> needs you" with the agent, pane
+and reason, through `osascript`; the pane's details sit inside escaped
+AppleScript strings, so they cannot change the script. macOS may ask once
+whether your terminal may send notifications.
 
 fleetwatch only reads panes; the notify command is yours to define.
 
@@ -90,8 +98,15 @@ fleetwatch only reads panes; the notify command is yours to define.
 - A pane is treated as a Claude Code instance when its foreground command looks
   like a version (e.g. `2.1.193`), which is how Claude Code appears in tmux.
   Override with `--match` if your setup differs.
+- Codex and Gemini CLI panes are found by their command (`codex`, `gemini`), or,
+  when installed through npm and shown as `node`, by their screen: Codex's
+  "Ask Codex to do anything" / "% context left", Gemini CLI's "Type your
+  message or @path/to/file" / "(esc to cancel, 8s)". `--agents codex,gemini`
+  limits the watch to some of them. A table with more than one agent gains an
+  agent column; JSON always has `agent`.
 - The captured text is classified, in order:
-  - `working` — actively generating (`esc to interrupt` in the footer).
+  - `working` — actively generating (`esc to interrupt` in the footer for
+    Claude Code and Codex, `(esc to cancel, 8s)` for Gemini CLI).
   - `blocked` — an interactive prompt awaits you, tagged with a triage
     category: `auth` (sign-in / login URL), `select` (a menu), `confirm`
     (yes/no, Accept/Decline, proceed, press-enter), or `input` (a question).
@@ -99,8 +114,14 @@ fleetwatch only reads panes; the notify command is yours to define.
   - `idle` — the ready input box is shown.
   - `unknown` — a screen with no recognizable markers (e.g. a modal).
 
-Detection is heuristic and tuned to the Claude Code TUI; it may need updating as
-that UI evolves. Contributions of new prompt signatures are welcome.
+Codex approvals ("Do you want to approve ...", "Would you like to run ...",
+"Press enter to confirm or esc to cancel") and Gemini CLI tool approvals
+("Allow once" / "No, suggest changes") count as `confirm`. The Codex patterns
+come from the screens its TUI snapshot tests render, the Gemini CLI ones from
+its UI source.
+
+Detection is heuristic and tuned to these TUIs; it may need updating as they
+evolve. Contributions of new prompt signatures are welcome.
 
 Because a wedged pane can also stall in a way no prompt signature matches,
 `--watch --stuck 10m` additionally flags any `working`/`unknown` pane whose

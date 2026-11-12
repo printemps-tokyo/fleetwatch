@@ -26,7 +26,7 @@ describe("renderTable", () => {
   });
 
   it("handles no panes", () => {
-    expect(renderTable([], false)).toContain("no Claude Code panes found");
+    expect(renderTable([], false)).toContain("no coding-agent panes found");
   });
 
   it("shows an age column when rows carry one (watch mode)", () => {
